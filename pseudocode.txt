@@ -1,0 +1,116 @@
+Pseudocode for µ Law Companding Algorithm
+
+# Top‑level routine
+FUNCTION Main()
+    INPUT_WAV       ← "input.wav"
+    COMPRESSED_RAW  ← "compressed.raw"
+    OUTPUT_WAV      ← "decompressed.wav"
+
+    startTime ← now() // To keep track of compression time
+
+    CompressToRaw(INPUT_WAV, COMPRESSED_RAW)
+    DecompressFromRaw(COMPRESSED_RAW, OUTPUT_WAV)
+
+    elapsed ← now() – startTime
+    PRINT "Total time:", elapsed
+END FUNCTION
+
+
+# Assuming we don't need the compressed file to be stored as a playable file
+# Read samples from a WAV, compress them, and write raw μ‑law bytes
+FUNCTION CompressToRaw(wavPath, rawPath)
+    header ← ReadWavHeader(wavPath)                  # get sample rate, channels
+    Open wavFile FOR reading
+    Open rawFile FOR writing in binary mode
+
+    WHILE NOT end of wavFile
+        samples ← ReadSamples(wavFile)
+        FOR each sample IN samples
+            code ← MuLawCompress(sample)
+            WriteByte(rawFile, code)
+        END FOR
+    END WHILE
+
+    Close wavFile
+    Close rawFile
+END FUNCTION
+
+
+# Read raw μ‑law bytes, expand them, and write a proper WAV
+FUNCTION DecompressFromRaw(rawPath, wavPath)
+    # We need to know the original sample rate and channels—
+    # read them from the original WAV header again
+    origHeader ← ReadWavHeader("input.wav")
+
+    # Prepare a new WAV header for 16‑bit PCM output
+    newHeader ← origHeader
+    newHeader.audioFormat   ← PCM
+    newHeader.bitsPerSample ← 16
+    RecalculateByteRateAndSizes(newHeader)
+
+    Open rawFile FOR reading in binary mode
+    Open wavFile FOR writing
+    WriteWavHeader(wavFile, newHeader)
+
+    WHILE NOT end of rawFile
+        codes ← ReadNextBlockOfBytes(rawFile)
+        FOR each code IN codes
+            sample ← MuLawDecompress(code)
+            WriteSample(wavFile, sample)
+        END FOR
+    END WHILE
+
+    Close rawFile
+    Close wavFile
+END FUNCTION
+
+
+# Convert one 16‑bit sample into one 8‑bit μ‑law code
+FUNCTION MuLawCompress(sample)
+    IF sample < 0 THEN
+        sign ← 1
+        mag  ← –sample
+    ELSE
+        sign ← 0
+        mag  ← sample
+    END IF
+
+    # Approximate natural log compression
+
+    # Find which magnitude range (segment) it fits
+    segment ← 0
+    WHILE mag ≥ (1 << (segment + 5)) AND segment < 7
+        segment ← segment + 1
+    END WHILE
+
+    # Quantize the remainder into a small step
+    step ← (mag >> (segment + 1)) AND 0x0F
+
+    # Pack sign, segment, and step, then invert bits
+    packed ← (sign << 7) OR (segment << 4) OR step
+    code   ← packed XOR 0xFF
+
+    RETURN code
+END FUNCTION
+
+
+# Convert one 8‑bit μ‑law code back into a 16‑bit sample
+FUNCTION MuLawDecompress(code)
+    inv     ← code XOR 0xFF
+    sign    ← (inv >> 7) AND 0x01
+    segment ← (inv >> 4) AND 0x07
+    step    ← inv AND 0x0F
+
+    # Reconstruct the magnitude
+    base ← (0x21 << segment)
+    mag  ← base OR (step << (segment + 1))
+
+    # Restore sign
+    IF sign == 1 THEN
+        sample ← –mag
+    ELSE
+        sample ← mag
+    END IF
+
+    RETURN sample
+END FUNCTION
