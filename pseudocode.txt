@@ -6,13 +6,16 @@ FUNCTION Main()
     COMPRESSED_RAW  ← "compressed.raw"
     OUTPUT_WAV      ← "decompressed.wav"
 
-    startTime ← now() // To keep track of compression time
-
+    startTimeCompression ← now() // To keep track of compression time
     CompressToRaw(INPUT_WAV, COMPRESSED_RAW)
+
+    startTimeDecompression ← now() // To keep track of decompression time
     DecompressFromRaw(COMPRESSED_RAW, OUTPUT_WAV)
 
     elapsed ← now() – startTime
-    PRINT "Total time:", elapsed
+    PRINT "Total processing time:", elapsed
+    PRINT "Compression time:", (startTimeDecompression - startTimeCompression)
+    PRINT "Decompression time:", (elapsed - startTimeDecompression)
 END FUNCTION
 
 
@@ -65,52 +68,13 @@ FUNCTION DecompressFromRaw(rawPath, wavPath)
 END FUNCTION
 
 
-# Convert one 16‑bit sample into one 8‑bit μ‑law code
+# Convert eight 16‑bit samples into 8‑bit μ‑law codes using NEON 
 FUNCTION MuLawCompress(sample)
-    IF sample < 0 THEN
-        sign ← 1
-        mag  ← –sample
-    ELSE
-        sign ← 0
-        mag  ← sample
-    END IF
-
-    # Approximate natural log compression
-
-    # Find which magnitude range (segment) it fits
-    segment ← 0
-    WHILE mag ≥ (1 << (segment + 5)) AND segment < 7
-        segment ← segment + 1
-    END WHILE
-
-    # Quantize the remainder into a small step
-    step ← (mag >> (segment + 1)) AND 0x0F
-
-    # Pack sign, segment, and step, then invert bits
-    packed ← (sign << 7) OR (segment << 4) OR step
-    code   ← packed XOR 0xFF
-
-    RETURN code
+    // To-do: Pseudocode
 END FUNCTION
 
 
-# Convert one 8‑bit μ‑law code back into a 16‑bit sample
+# Convert raw data back to 16‑bit samples
 FUNCTION MuLawDecompress(code)
-    inv     ← code XOR 0xFF
-    sign    ← (inv >> 7) AND 0x01
-    segment ← (inv >> 4) AND 0x07
-    step    ← inv AND 0x0F
-
-    # Reconstruct the magnitude
-    base ← (0x21 << segment)
-    mag  ← base OR (step << (segment + 1))
-
-    # Restore sign
-    IF sign == 1 THEN
-        sample ← –mag
-    ELSE
-        sample ← mag
-    END IF
-
-    RETURN sample
+    // To-do: Pseudocode
 END FUNCTION
