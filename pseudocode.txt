@@ -70,11 +70,52 @@ END FUNCTION
 
 # Convert eight 16‑bit samples into 8‑bit μ‑law codes using NEON 
 FUNCTION MuLawCompress(sample)
-    // To-do: Pseudocode
+    # We need to know the sign of each value, and where the most
+    # significant bit is.
+    signs           <- getSigns(sample)
+    leadingZeroes   <- countLeadingZeroes(sample)
+
+    # The constant 11 converts the number of leading zeroes into the
+    # number of bits we need to shift right.
+    shiftRight <- 11 - leadingZeroes
+
+    # Since we're compressing 8 values all at once, It's faster
+    # to zero out all values too small then it is to check their
+    # size and skip all very small values. Anything less than 0x80
+    # should be set to zero, so we can bring all smaller values up to
+    # 0x80.
+    sample <- max(sample, 0x0080)
+
+    out <- sample >> shiftRight
+
+    # In order to know how much to shift left when decompressing,
+    # we need a 3-bit chord. This can also be determined from the
+    # leading zeroes
+    chord <- 8 - leadingZeroes
+    chord <- chord << 4
+    out <- out + chord
+
+    # Finally, add back the sign
+    out <- addSign(out, sign)
+
+    RETURN out
+
 END FUNCTION
 
 
 # Convert raw data back to 16‑bit samples
 FUNCTION MuLawDecompress(code)
-    // To-do: Pseudocode
+    # First, separate the 8-bit code into the sign, chord, and steps
+    sign <- getSign(code)
+    chord <- getChord(code)
+    steps <- getSteps(code)
+
+    # The leading bit is removed during compression, it needs to be
+    # added back
+    steps <- steps + 16
+    out <- steps << chord
+    out <- addSign(out, sign)
+
+    RETURN out
+
 END FUNCTION
